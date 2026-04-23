@@ -44,6 +44,41 @@ pressio_registry<std::unique_ptr<launch::libpressio_launch_plugin>>& launch_plug
 
 namespace libpressio { namespace metrics { namespace external_ns {
 
+#if defined(_WIN32)
+class external_metric_plugin : public libpressio_metrics_plugin {
+public:
+  pressio_options get_metrics_results(pressio_options const&) override {
+    pressio_options opts;
+    set(opts, "external:error", "external metric is unavailable on Windows");
+    return opts;
+  }
+
+  std::unique_ptr<libpressio_metrics_plugin> clone() override {
+    return compat::make_unique<external_metric_plugin>(*this);
+  }
+
+  struct pressio_options get_configuration_impl() const override {
+    pressio_options opts;
+    set(opts, "pressio:stability", "experimental");
+    set(opts, "pressio:thread_safe", pressio_thread_safety_multiple);
+    set(opts, "predictors:requires_decompress", false);
+    set(opts, "predictors:invalidate", std::vector<std::string>{});
+    return opts;
+  }
+
+  pressio_options get_documentation_impl() const override {
+    pressio_options opts;
+    set(opts, "pressio:description", "external metric is unavailable on Windows");
+    return opts;
+  }
+
+  const char* prefix() const override {
+    return "external";
+  }
+};
+
+pressio_register registration(metrics_plugins(), "external", [](){ return compat::make_unique<external_metric_plugin>(); });
+#else
 using std::chrono::high_resolution_clock;
 using std::chrono::time_point;
 using std::chrono::duration;
@@ -406,4 +441,5 @@ class external_metric_plugin : public libpressio_metrics_plugin {
 
 
 pressio_register registration(metrics_plugins(), "external", [](){ return compat::make_unique<external_metric_plugin>(); });
+#endif
 } }}

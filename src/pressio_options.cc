@@ -1,11 +1,29 @@
 #include <map>
 #include <algorithm>
 #include <string>
+#include <cstdlib>
 #include <cstring>
 #include <sstream>
 #include "libpressio_ext/cpp/options.h"
 #include "libpressio_ext/cpp/printers.h"
 #include "std_compat/std_compat.h"
+
+#if defined(_WIN32)
+static char* pressio_strndup(const char* input, size_t size) {
+  size_t length = std::min(strlen(input), size);
+  char* value = static_cast<char*>(malloc(length + 1));
+  if(value == nullptr) {
+    return nullptr;
+  }
+  memcpy(value, input, length);
+  value[length] = '\0';
+  return value;
+}
+#else
+static char* pressio_strndup(const char* input, size_t size) {
+  return strndup(input, size);
+}
+#endif
 
 
 void pressio_options_free(struct pressio_options* options) {
@@ -108,7 +126,7 @@ enum pressio_options_key_status pressio_options_get_string(struct pressio_option
   std::string value_tmp;
   auto status = options->get(key, &value_tmp);
   if(status == pressio_options_key_set) {
-    *value = strndup(value_tmp.c_str(), value_tmp.size());
+    *value = pressio_strndup(value_tmp.c_str(), value_tmp.size());
   }
   return status;
 }
@@ -117,7 +135,7 @@ enum pressio_options_key_status pressio_options_cast_string(struct pressio_optio
   std::string value_tmp;
   auto status = options->cast(key, &value_tmp, safety); 
   if(status == pressio_options_key_set) {
-    *value = strndup(value_tmp.c_str(), value_tmp.size());
+    *value = pressio_strndup(value_tmp.c_str(), value_tmp.size());
   }
   return status;
 }
@@ -151,7 +169,7 @@ enum pressio_options_key_status pressio_options_get_strings(struct pressio_optio
     *size = strings.size();
     *values = static_cast<const char**>(malloc(sizeof(const char*)**size));
     for (size_t i = 0; i < *size; ++i) {
-      (*values)[i] = strndup(strings[i].c_str(), strings[i].size());
+      (*values)[i] = pressio_strndup(strings[i].c_str(), strings[i].size());
     }
   } else {
     *size = 0;
@@ -167,7 +185,7 @@ enum pressio_options_key_status pressio_options_cast_strings(struct pressio_opti
     *size = strings.size();
     *values = static_cast<char**>(malloc(sizeof(char*)* (*size)));
     for (size_t i = 0; i < *size; ++i) {
-      (*values)[i] = strndup(strings[i].c_str(), strings[i].size());
+      (*values)[i] = pressio_strndup(strings[i].c_str(), strings[i].size());
     }
   }
   return status;

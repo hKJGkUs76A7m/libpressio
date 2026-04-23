@@ -1,6 +1,70 @@
 #include "libpressio_ext/launch/external_launch.h"
 #include <memory>
 #include <sstream>
+#if defined(_WIN32)
+#include "pressio_compressor.h"
+#include "std_compat/memory.h"
+
+namespace libpressio { namespace launch { namespace external_forkexec_ns {
+
+struct external_forkexec: public libpressio_launch_plugin {
+  extern_proc_results launch_impl(std::vector<std::string> const&) const override {
+    extern_proc_results results;
+    results.return_code = -1;
+    results.error_code = fork_error;
+    results.proc_stderr = "forkexec launch is unavailable on Windows";
+    return results;
+  }
+
+  const char* prefix() const override {
+    return "forkexec";
+  }
+
+  int set_options_impl(pressio_options const& options) override {
+    get(options, "external:workdir", &workdir);
+    std::string command;
+    if(get(options, "external:commands", &command) == pressio_options_key_set) {
+        commands = {command};
+    } else {
+        get(options, "external:commands", &commands);
+    }
+    return 0;
+  }
+
+  struct pressio_options get_configuration_impl() const override {
+    struct pressio_options options;
+    set(options, "pressio:thread_safe", pressio_thread_safety_multiple);
+    set(options, "pressio:stability", "experimental");
+    return options;
+  }
+
+  pressio_options get_documentation_impl() const override {
+    pressio_options options;
+    set(options, "pressio:description", "forkexec launch is unavailable on Windows");
+    set(options, "external:workdir", "working directory for the child process");
+    set(options, "external:commands", "list of strings passed to exec");
+    return options;
+  }
+
+  pressio_options get_options_impl() const override {
+    pressio_options options;
+    set(options, "external:workdir", workdir);
+    set(options, "external:commands", commands);
+    return options;
+  }
+
+  std::unique_ptr<libpressio_launch_plugin> clone() const override {
+    return compat::make_unique<external_forkexec>(*this);
+  }
+
+  std::string workdir=".";
+  std::vector<std::string> commands;
+};
+
+pressio_register registration(launch_plugins(), "forkexec", [](){ return compat::make_unique<external_forkexec>();});
+
+}}}
+#else
 #include <unistd.h>
 #include <iterator>
 #include <sys/wait.h>
@@ -218,3 +282,4 @@ extern_proc_results launch_impl(std::vector<std::string> const& full_command) co
 pressio_register registration(launch_plugins(), "forkexec", [](){ return compat::make_unique<external_forkexec>();});
 
 }}}
+#endif
