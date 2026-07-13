@@ -219,11 +219,13 @@ public:
                     struct pressio_data* output) override
   {
     cleanup restore_threads;
+#ifdef _OPENMP
     if(config.openmp) {
         int32_t old_threads = omp_get_num_threads();
         omp_set_num_threads(static_cast<int32_t>(nthreads));
         restore_threads = [old_threads]{ omp_set_num_threads(old_threads);};
     }
+#endif
 
     pressio_data input = domain_manager().make_readable(domain_plugins().build("malloc"), *real_input);
     auto reg_dims = input.normalized_dims();
@@ -240,11 +242,13 @@ public:
                       struct pressio_data* output) override
   {
     cleanup restore_threads;
+#ifdef _OPENMP
     if(config.openmp) {
         int32_t old_threads = omp_get_num_threads();
         omp_set_num_threads(static_cast<int32_t>(nthreads));
         restore_threads = [old_threads]{ omp_set_num_threads(old_threads);};
     }
+#endif
 
     pressio_data input = domain_manager().make_readable(domain_plugins().build("malloc"), *real_input);
     std::vector<size_t> output_dims = output->normalized_dims();

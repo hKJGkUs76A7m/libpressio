@@ -696,15 +696,48 @@ endif()
 
 # static libraries and some system linkers will strip the registration classes 
 # causing nothing to be registered
-add_executable(pressio_register_generator src/pressio_register_generator.cc)
-target_compile_features(pressio_register_generator PRIVATE cxx_std_11)
-add_custom_command(
-    OUTPUT pressio_manual_register.cc
-    COMMAND "${CMAKE_CURRENT_BINARY_DIR}/pressio_register_generator" -c "${LIBPRESSIO_BUILT_PLUGINS}" -o "${CMAKE_CURRENT_BINARY_DIR}/pressio_manual_register.cc"
-    COMMENT "generating registration source file"
-    DEPENDS pressio_register_generator ${LIBPRESSIO_BUILT_PLUGINS} src/pressio_register_generator.cc
-    VERBATIM
-)
+if(EMSCRIPTEN)
+  set(pressio_registration_entries "")
+  foreach(plugin_path IN LISTS LIBPRESSIO_BUILT_PLUGINS)
+    get_filename_component(plugin_name "${plugin_path}" NAME_WE)
+    get_filename_component(plugin_directory "${plugin_path}" DIRECTORY)
+    get_filename_component(plugin_type "${plugin_directory}" NAME)
+    list(APPEND pressio_registration_entries "${plugin_type}|${plugin_name}")
+  endforeach()
+  list(SORT pressio_registration_entries)
+
+  set(pressio_manual_register_content
+      "#include \"libpressio_ext/cpp/registry.h\"\n\n")
+  set(pressio_manual_register_body
+      "extern \"C\" void pressio_register_all() {\n")
+  foreach(registration_entry IN LISTS pressio_registration_entries)
+    string(REPLACE "|" ";" registration_parts "${registration_entry}")
+    list(GET registration_parts 0 plugin_type)
+    list(GET registration_parts 1 plugin_name)
+    string(APPEND pressio_manual_register_content
+        "namespace libpressio { namespace ${plugin_type} { namespace ${plugin_name}_ns {\n"
+        "extern pressio_register registration;\n"
+        "}}}\n")
+    string(APPEND pressio_manual_register_body
+        "  libpressio::${plugin_type}::${plugin_name}_ns::registration.ensure_registered();\n")
+  endforeach()
+  string(APPEND pressio_manual_register_content
+      "\n${pressio_manual_register_body}}\n")
+  file(CONFIGURE
+      OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/pressio_manual_register.cc"
+      CONTENT "${pressio_manual_register_content}"
+      @ONLY)
+else()
+  add_executable(pressio_register_generator src/pressio_register_generator.cc)
+  target_compile_features(pressio_register_generator PRIVATE cxx_std_11)
+  add_custom_command(
+      OUTPUT pressio_manual_register.cc
+      COMMAND "${CMAKE_CURRENT_BINARY_DIR}/pressio_register_generator" -c "${LIBPRESSIO_BUILT_PLUGINS}" -o "${CMAKE_CURRENT_BINARY_DIR}/pressio_manual_register.cc"
+      COMMENT "generating registration source file"
+      DEPENDS pressio_register_generator ${LIBPRESSIO_BUILT_PLUGINS} src/pressio_register_generator.cc
+      VERBATIM
+  )
+endif()
 target_sources(libpressio PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/pressio_manual_register.cc)
 
 configure_file(
