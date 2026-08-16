@@ -15,8 +15,16 @@
 
 #include "pressio_posix.h"
 #include <cstring>
+#if defined(_WIN32)
+#include <io.h>
+#define pressio_access _access
+constexpr int pressio_write_access = 2;
+#else
 #include <sys/types.h>
 #include <unistd.h>
+#define pressio_access access
+constexpr int pressio_write_access = W_OK;
+#endif
 #include <errno.h>
 #include <pressio_data.h>
 #include <cassert>
@@ -258,7 +266,7 @@ struct hdf5_io: public libpressio_io_plugin {
     //check if the file exists
     auto data = domain_manager().make_readable(domain_plugins().build("malloc"), *indata);
     hid_t file;
-    int perms_ok = access(filename.c_str(), W_OK);
+    int perms_ok = pressio_access(filename.c_str(), pressio_write_access);
     cleanup cleanup_facl;
     hid_t fapl_plist = H5P_DEFAULT;
 #if defined(H5_HAVE_PARALLEL) && H5_HAVE_PARALLEL

@@ -261,7 +261,7 @@ if(LIBPRESSIO_HAS_OPENMP)
 endif()
 
 option(LIBPRESSIO_HAS_LINUX "plugins that depend on various unixisms" OFF)
-if(LIBPRESSIO_HAS_LINUX)
+if(LIBPRESSIO_HAS_LINUX AND UNIX)
   libpressio_plugin_file(/metrics/rusage.cc)
   libpressio_plugin_file(/io/mmap.cc)
 endif()
@@ -507,7 +507,7 @@ endif()
 
 
 option(LIBPRESSIO_HAS_CUFILE "build the cufile io plugin" OFF)
-if(LIBPRESSIO_HAS_CUFILE)
+if(LIBPRESSIO_HAS_CUFILE AND UNIX)
   set(LIBPRESSIO_FEATURES "${LIBPRESSIO_FEATURES} cufile")
   find_package(CUDAToolkit REQUIRED)
   find_library(CUFile_LIBRARY cufile PATHS ${CUDAToolkit_LIBRARY_DIR} REQUIRED)
@@ -649,7 +649,9 @@ if(LIBPRESSIO_HAS_JSON)
   set(LIBPRESSIO_FEATURES "${LIBPRESSIO_FEATURES} json")
   find_package(nlohmann_json REQUIRED)
   target_link_libraries(libpressio PRIVATE nlohmann_json::nlohmann_json)
-  libpressio_plugin_file(/compressors/external.cc)
+  if(NOT WIN32)
+    libpressio_plugin_file(/compressors/external.cc)
+  endif()
   libpressio_plugin_file(/compressors/manifest.cc)
   target_sources(libpressio
     PRIVATE
@@ -830,7 +832,7 @@ if(BUILD_MIGRATION_TOOLS)
 endif()
 
 option(BUILD_DOCS "build the documetation" OFF)
-if(BUILD_DOCS)
+if(BUILD_DOCS AND NOT WIN32)
   add_subdirectory(tools/docs)
 
 

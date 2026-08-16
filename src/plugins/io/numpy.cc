@@ -1,8 +1,9 @@
 #include <vector>
 #include <regex>
 #include <fstream>
+#include <cstdint>
+#include <limits>
 #include <sstream>
-#include <sys/stat.h>
 #include "pressio_data.h"
 #include "pressio_compressor.h"
 #include "libpressio_ext/io/posix.h"
@@ -23,12 +24,27 @@ std::string libpressio_read_data(std::string const& path) {
   if(not (infile.is_open() && infile.good())) {
     throw std::runtime_error("failed to read " + path);
   }
-  struct stat buf = {};
-  stat(path.c_str(), &buf);
-  const size_t size = buf.st_size;
+  infile.seekg(0, std::ios::end);
+  const auto end_offset = static_cast<std::streamoff>(infile.tellg());
+  if(end_offset < 0 ||
+     static_cast<std::uintmax_t>(end_offset) > std::numeric_limits<size_t>::max() ||
+     static_cast<std::uintmax_t>(end_offset) >
+         static_cast<std::uintmax_t>(std::numeric_limits<std::streamsize>::max())) {
+    throw std::runtime_error("failed to determine the size of " + path);
+  }
+  const size_t size = static_cast<size_t>(end_offset);
+  infile.seekg(0, std::ios::beg);
+  if(!infile.good()) {
+    throw std::runtime_error("failed to seek in " + path);
+  }
 
   std::string data(size, 0);
-  infile.read(&data[0], size);
+  if(size != 0) {
+    infile.read(&data[0], static_cast<std::streamsize>(size));
+    if(!infile) {
+      throw std::runtime_error("failed to read " + path);
+    }
+  }
 
   return data;
 }

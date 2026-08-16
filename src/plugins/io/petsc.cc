@@ -11,9 +11,7 @@
 #include <petscsys.h>
 #include <petscsystypes.h>
 #include <petscviewer.h>
-#include <sys/stat.h>
 #include <type_traits>
-#include <unistd.h>
 #include <vector>
 #include "std_compat/memory.h"
 

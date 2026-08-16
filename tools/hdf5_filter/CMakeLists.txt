@@ -4,13 +4,15 @@ add_library(libpressio_hdf5_filter
   ./include/libpressio_hdf5_filter.h
   ./src/libpressio_hdf5_filter_impl.h
   )
-add_executable(pressio_hdf5_filter_tool
-  ./src/libpressio_hdf5_filter_tool.cc
-  ./src/libpressio_hdf5_filter.cc
-  ./src/libpressio_hdf5_props.cc
-  ./include/libpressio_hdf5_filter.h
-  ./src/libpressio_hdf5_filter_impl.h
-  )
+if(NOT WIN32)
+  add_executable(pressio_hdf5_filter_tool
+    ./src/libpressio_hdf5_filter_tool.cc
+    ./src/libpressio_hdf5_filter.cc
+    ./src/libpressio_hdf5_props.cc
+    ./include/libpressio_hdf5_filter.h
+    ./src/libpressio_hdf5_filter_impl.h
+    )
+endif()
 function(lp_add_hdf_deps name)
   target_link_libraries(${name} PUBLIC ${HDF5_C_LIBRARIES})
   target_include_directories(${name} PUBLIC ${HDF5_C_INCLUDE_DIRS})
@@ -36,7 +38,9 @@ function(lp_add_hdf_deps name)
     )
 endfunction()
 lp_add_hdf_deps(libpressio_hdf5_filter)
-lp_add_hdf_deps(pressio_hdf5_filter_tool)
+if(NOT WIN32)
+  lp_add_hdf_deps(pressio_hdf5_filter_tool)
+endif()
 
 install(FILES ./include/libpressio_hdf5_filter.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libpressio)
 install(TARGETS libpressio_hdf5_filter EXPORT LibPressioTargets
@@ -44,8 +48,10 @@ install(TARGETS libpressio_hdf5_filter EXPORT LibPressioTargets
   LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/hdf5/lib/plugin
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   )
-install(TARGETS pressio_hdf5_filter_tool EXPORT LibPressioTargets
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-  )
+if(NOT WIN32)
+  install(TARGETS pressio_hdf5_filter_tool EXPORT LibPressioTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+endif()

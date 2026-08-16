@@ -4,7 +4,9 @@
 #include <vector>
 #include <utility>
 #include <sstream>
+#if !defined(_WIN32)
 #include <unistd.h>
+#endif
 #include <chrono>
 #include <iterator>
 #include "pressio_data.h"

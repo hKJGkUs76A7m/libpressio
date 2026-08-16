@@ -5,7 +5,9 @@
 #include <string>
 #include <sstream>
 #include <iomanip>
+#if !defined(_WIN32)
 #include <unistd.h>
+#endif
 
 struct cli_args {
     std::string config;
@@ -28,6 +30,19 @@ std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>&
 
 int main(int argc, char* argv[]) {
     cli_args args;
+#if defined(_WIN32)
+    for (int index = 1; index < argc; ++index) {
+        const std::string option = argv[index];
+        if ((option == "-o" || option == "-c") && index + 1 < argc) {
+            const std::string value = argv[++index];
+            if (option == "-o") args.output_path = value;
+            else args.config = value;
+        } else {
+            std::cerr << "unknown or incomplete argument \"" << option << "\"" << std::endl;
+            return 1;
+        }
+    }
+#else
     int opt = 0;
     while((opt = getopt(argc, argv, "o:c:")) != -1) {
         switch(opt) {
@@ -42,6 +57,7 @@ int main(int argc, char* argv[]) {
                 return 1;
         }
     }
+#endif
     std::cerr << args << std::endl;
 
 

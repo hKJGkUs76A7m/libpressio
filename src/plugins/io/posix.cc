@@ -1,5 +1,45 @@
+#include <cstddef>
+#include <cstdio>
+#include <cstdint>
+#include <limits>
+#if defined(_WIN32)
+#include <algorithm>
+#include <io.h>
+#include <sys/stat.h>
+using pressio_stat_type = struct _stat64;
+inline int pressio_fstat(int fd, pressio_stat_type* statbuf) {
+  return _fstat64(fd, statbuf);
+}
+inline int pressio_fileno(FILE* file) {
+  return _fileno(file);
+}
+inline int pressio_read(int fd, void* buffer, size_t count) {
+  const auto chunk_size = static_cast<unsigned int>(
+      std::min(count, static_cast<size_t>(std::numeric_limits<int>::max())));
+  return _read(fd, buffer, chunk_size);
+}
+inline int pressio_write(int fd, const void* buffer, size_t count) {
+  const auto chunk_size = static_cast<unsigned int>(
+      std::min(count, static_cast<size_t>(std::numeric_limits<int>::max())));
+  return _write(fd, buffer, chunk_size);
+}
+#else
 #include <sys/stat.h>
 #include <unistd.h>
+using pressio_stat_type = struct stat;
+inline int pressio_fstat(int fd, pressio_stat_type* statbuf) {
+  return fstat(fd, statbuf);
+}
+inline int pressio_fileno(FILE* file) {
+  return fileno(file);
+}
+inline ssize_t pressio_read(int fd, void* buffer, size_t count) {
+  return read(fd, buffer, count);
+}
+inline ssize_t pressio_write(int fd, const void* buffer, size_t count) {
+  return write(fd, buffer, count);
+}
+#endif
 #include <vector>
 #include <errno.h>
 #include "pressio_data.h"
@@ -31,18 +71,27 @@ extern "C" {
         ret = pressio_data_new_owning(dtype, dims_v.size(), dims_v.data());
       }
     } else {
-      struct stat statbuf;
-      if(fstat(in_filedes, &statbuf)) {
+      pressio_stat_type statbuf;
+      if(pressio_fstat(in_filedes, &statbuf)) {
         return nullptr;
-      } 
+      }
+      if(statbuf.st_size < 0 ||
+         static_cast<std::uintmax_t>(statbuf.st_size) > std::numeric_limits<size_t>::max()) {
+        return nullptr;
+      }
       size_t size = static_cast<size_t>(statbuf.st_size); 
       ret = pressio_data_new_owning(pressio_byte_dtype, 1, &size);
     }
-               size_t total_read = 0;
-               size_t bytes_read = 0;
-               while((bytes_read = read(in_filedes, ((uint8_t*)pressio_data_ptr(ret, nullptr))+total_read, pressio_data_get_bytes(ret) - total_read)) > 0) {
-                               total_read += bytes_read;
-               }
+    const size_t buffer_size = pressio_data_get_bytes(ret);
+    size_t total_read = 0;
+    while(total_read < buffer_size) {
+      const auto bytes_read = pressio_read(
+          in_filedes,
+          static_cast<uint8_t*>(pressio_data_ptr(ret, nullptr)) + total_read,
+          buffer_size - total_read);
+      if(bytes_read <= 0) break;
+      total_read += static_cast<size_t>(bytes_read);
+    }
     if(total_read != pressio_data_get_bytes(ret)) {
       pressio_data_free(ret);
       return nullptr;
@@ -53,12 +102,12 @@ extern "C" {
 
   struct pressio_data* pressio_io_data_fread(struct pressio_data* dims, FILE* in_file) {
     if(in_file == nullptr) return nullptr;
-    return pressio_io_data_read(dims, fileno(in_file));
+    return pressio_io_data_read(dims, pressio_fileno(in_file));
   }
 
 
   struct pressio_data* pressio_io_data_path_read(struct pressio_data* dims, const char* path) {
-    FILE* in_file = fopen(path, "r");
+    FILE* in_file = fopen(path, "rb");
     if(in_file != nullptr) {
       auto ret = pressio_io_data_fread(dims, in_file);
       fclose(in_file);
@@ -71,20 +120,25 @@ extern "C" {
 
   size_t pressio_io_data_fwrite(struct pressio_data const* data, FILE* out_file) {
 
-    return pressio_io_data_write(data, fileno(out_file));
+    return pressio_io_data_write(data, pressio_fileno(out_file));
   }
 
   size_t pressio_io_data_write(struct pressio_data const* data, int out_filedes) {
+    const size_t buffer_size = pressio_data_get_bytes(data);
     size_t total_written = 0;
-    size_t bytes_written = 0;
-    while((bytes_written = write(out_filedes, ((uint8_t*)pressio_data_ptr(data, nullptr)) + total_written, pressio_data_get_bytes(data) - total_written)) > 0) {
-      total_written += bytes_written;
+    while(total_written < buffer_size) {
+      const auto bytes_written = pressio_write(
+          out_filedes,
+          static_cast<const uint8_t*>(pressio_data_ptr(data, nullptr)) + total_written,
+          buffer_size - total_written);
+      if(bytes_written <= 0) break;
+      total_written += static_cast<size_t>(bytes_written);
     }
     return total_written;
   }
 
   size_t pressio_io_data_path_write(struct pressio_data const* data, const char* path) {
-    FILE* out_file = fopen(path, "w");
+    FILE* out_file = fopen(path, "wb");
     if(out_file != nullptr) {
       auto ret = pressio_io_data_fwrite(data, out_file);
       fclose(out_file);
